@@ -1,0 +1,15 @@
+[package]
+name = "ragnarok"
+version = "0.1.0"
+authors = ["msiglreith <m.siglreith@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+winit = "0.22"
+d3d12 = { git = "https://github.com/gfx-rs/d3d12-rs.git", features = ["implicit-link"] }
+winapi = { version = "0.3" }
+hassle-rs = "0.3"
+usvg = "0.9"
+pathbreaker = { path = "../pathbreaker" }
