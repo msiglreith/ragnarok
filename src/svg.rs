@@ -73,6 +73,7 @@ pub fn generate_gpu_data(paths: &[kurbo::BezPath]) -> GpuData {
         }
 
         let primitive_end = gpu_data.primitives.len();
+        // println!("{:?}", primitive_end - primitive_start);
         gpu_data.objects.push(Object {
             primitives: [primitive_start as _, primitive_end as _],
             offset_data: data_offset as _,

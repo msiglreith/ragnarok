@@ -6,10 +6,10 @@ use winit::{
     window::WindowBuilder,
 };
 
-const GROUP_X: u32 = 8;
+const GROUP_X: u32 = 1;
 const GROUP_Y: u32 = 32;
 
-const WIDTH: u32 = GROUP_X * 128;
+const WIDTH: u32 = GROUP_X * 1024;
 const HEIGHT: u32 = GROUP_Y * 32;
 
 const TILES_X: u32 = WIDTH / GROUP_X;

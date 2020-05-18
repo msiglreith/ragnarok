@@ -1,4 +1,4 @@
-static const uint GROUP_X = 8;
+static const uint GROUP_X = 1;
 static const uint GROUP_Y = 32;
 static const uint NUM_THREADS = GROUP_X * GROUP_Y;
 static const uint NUM_WAVES = NUM_THREADS / 32;
@@ -46,6 +46,7 @@ struct Intersection {
     float distance;
     float slope;
     float dx;
+    float min_y;
     float max_y;
 };
 groupshared Intersection line_intersect[GROUP_X][GROUP_Y];
@@ -64,7 +65,6 @@ void test(
     const float2 unit = 1.0 / dxdy;
 
     const float2 wave_start = tile_group_offset + float2(group_thread_id.x + 0.5, 0.0) * dxdy;
-    const float2 fragment_center = wave_start + float2(0.0, group_thread_id.y + 0.5) * dxdy;
 
     float coverage = 0.0;
 
@@ -94,43 +94,44 @@ void test(
             float local_coverage = 0.0;
 
             uint base = local_obj.offset_data;
-            for (uint p = local_obj.primitives.x; p < local_obj.primitives.y; p += GROUP_Y) {
-                if (p + lane >= local_obj.primitives.y) {
-                    continue;
-                }
+            for (uint p = local_obj.primitives.x; p < local_obj.primitives.y; p += 1) {
+                if (p + 0 < local_obj.primitives.y) {
+                    const uint vertex_offset = local_obj.offset_data + (p - local_obj.primitives.x + 0) * 4;
+                    const float2 p0 = float2(asfloat(t_data[vertex_offset]), asfloat(t_data[vertex_offset+1])) - wave_start;
+                    const float2 p1 = float2(asfloat(t_data[vertex_offset+2]), asfloat(t_data[vertex_offset+3])) - wave_start;
 
-                const uint vertex_offset = (p + lane) * 4;
-                const float2 p0 = float2(asfloat(t_data[vertex_offset]), asfloat(t_data[vertex_offset+1])) - wave_start;
-                const float2 p1 = float2(asfloat(t_data[vertex_offset+2]), asfloat(t_data[vertex_offset+3])) - wave_start;
+                    Intersection line_intersection;
+                    line_intersection.min_y = min(p0.y, p1.y);
+                    line_intersection.max_y = max(p0.y, p1.y);
+                    line_intersection.dx = 1.0;
 
-                Intersection line_intersection;
-                line_intersection.max_y = max(p0.y, p1.y);
+                    if (line_intersection.min_y >= 0.0) {
+                        const float xx0 = clamp(p0.x, -0.5 * dxdy.x, 0.5 * dxdy.x);
+                        const float xx1 = clamp(p1.x, -0.5 * dxdy.x, 0.5 * dxdy.x);
+                        line_intersection.dx = (xx1 - xx0) * unit.x;
 
-                {
-                    const float xx0 = clamp(p0.x, -0.5 * dxdy.x, 0.5 * dxdy.x);
-                    const float xx1 = clamp(p1.x, -0.5 * dxdy.x, 0.5 * dxdy.x);
-                    line_intersection.dx = (xx1 - xx0) * unit.x;
-                    line_intersection.distance = 0.5;
-                    line_intersection.slope = 1.0;
-
-                    if (line_intersection.dx != 0.0 && min(p0.y, p1.y) < tile_goup_extent.y) {
-                        const float t = line_raycast(p0.x, p1.x, 0.5 * (xx0 + xx1)); // raycast y direction at sample pos
-                        const float d = line_eval(p0.y, p1.y, t) * unit.y; // get x value at ray intersection
-                        const float2 tangent = abs(p1 - p0);
-                        const float m = tangent.x / max(tangent.x, tangent.y);
-                        line_intersection.distance = d;
-                        line_intersection.slope = m;
+                        if (line_intersection.dx != 0.0 && line_intersection.max_y < tile_goup_extent.y) {
+                            const float t = line_raycast(p0.x, p1.x, 0.5 * (xx0 + xx1)); // raycast y direction at sample pos
+                            const float d = line_eval(p0.y, p1.y, t) * unit.y; // get x value at ray intersection
+                            const float2 tangent = abs(p1 - p0);
+                            const float m = tangent.x / max(tangent.x, tangent.y);
+                            line_intersection.distance = d;
+                            line_intersection.slope = m;
+                        }
                     }
+
+                    line_intersect[group_thread_id.x][group_thread_id.y] = line_intersection;
                 }
 
-                line_intersect[group_thread_id.x][group_thread_id.y] = line_intersection;
-
-                const uint num_lanes = WaveActiveCountBits(true);
-                for (uint l = 0; l < num_lanes; l++) {
-                    Intersection line_intersection = line_intersect[group_thread_id.x][l];
-                    if (line_intersection.max_y >= 0.0) {
-                        const float cy = cdf(line_intersection.distance, 1.0);
-                        local_coverage += cy * line_intersection.dx;
+                const uint num_lanes = WaveActiveCountBits(p + lane < local_obj.primitives.y);
+                for (uint l = 0; l < 1; l++) {
+                    Intersection local_intersection = line_intersect[group_thread_id.x][group_thread_id.y];
+                    if (local_intersection.min_y >= group_thread_id.y * dxdy.y) {
+                        float cy = 1.0;
+                        if ((local_intersection.dx != 0.0) && (local_intersection.max_y < ((group_thread_id.y + 1) * dxdy.y))) {
+                            cy = cdf(local_intersection.distance - (group_thread_id.y + 0.5), 1.0);
+                        }
+                        local_coverage += cy * local_intersection.dx;
                     }
                 }
             }
