@@ -29,13 +29,17 @@ impl GpuData {
     }
 }
 
+fn up_align(x: u32, alignment: u32) -> u32 {
+    (x + alignment - 1) & !(alignment - 1)
+}
+
 pub fn generate_gpu_data(paths: &[kurbo::BezPath]) -> GpuData {
     let mut gpu_data = GpuData::new();
 
     for path in paths {
         let aabb = path.bounding_box();
 
-        let data_offset = gpu_data.data.len();
+        let data_offset = gpu_data.data.len() / 4;
         let primitive_start = gpu_data.primitives.len();
 
         let mut first = kurbo::Point::ZERO;
@@ -73,7 +77,6 @@ pub fn generate_gpu_data(paths: &[kurbo::BezPath]) -> GpuData {
         }
 
         let primitive_end = gpu_data.primitives.len();
-        // println!("{:?}", primitive_end - primitive_start);
         gpu_data.objects.push(Object {
             primitives: [primitive_start as _, primitive_end as _],
             offset_data: data_offset as _,

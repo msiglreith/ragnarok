@@ -6,10 +6,10 @@ use winit::{
     window::WindowBuilder,
 };
 
-const GROUP_X: u32 = 1;
+const GROUP_X: u32 = 8;
 const GROUP_Y: u32 = 32;
 
-const WIDTH: u32 = GROUP_X * 1024;
+const WIDTH: u32 = GROUP_X * 128;
 const HEIGHT: u32 = GROUP_Y * 32;
 
 const TILES_X: u32 = WIDTH / GROUP_X;
@@ -202,8 +202,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &svg_data_gpu,
         descriptor_pool.view_cpu(4),
         &ragnarok::UniformBufferDesc {
-            elements: 0..svg_path.data.len(),
-            stride: mem::size_of::<u32>(),
+            elements: 0..svg_path.data.len() / 4,
+            stride: mem::size_of::<u32>() * 4,
         },
     );
 
